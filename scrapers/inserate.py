@@ -28,44 +28,38 @@ async def get_inserate_klaz(
     if query:
         params["keywords"] = query
     if location:
-        # location wird zusätzlich im Pfad genutzt
         params["locationStr"] = location
     if radius:
         params["radius"] = radius
 
-    # Suchpfad nach Kleinanzeigen-Schema:
-    # /s-{PLZ}{price_path}/seite:{page}
-    # z.B. /s-35390/preis:100:500/seite:2
+    # Suchpfad
     if location:
         search_path = f"/s-{location}{price_path}/seite:{{page}}"
     else:
-        # Fallback ohne PLZ (allgemeine Suche)
         search_path = f"/s{price_path}/seite:{{page}}"
 
-    # Basis-URL (page wird später mit .format ersetzt)
     search_url = base_url + search_path + ("?" + urlencode(params) if params else "")
 
     page = await browser_manager.new_context_page()
     try:
         # Erste Seite laden
         first_url = search_url.format(page=1)
-        vawait page.goto(first_url, timeout=120000)
-await page.wait_for_selector(".ad-listitem", timeout=60000)
+        await page.goto(first_url, timeout=120000)
+        # Warten, bis Anzeigen vorhanden sind statt networkidle
+        await page.wait_for_selector(".ad-listitem", timeout=60000)
 
         results = []
 
         for i in range(page_count):
-            # Seite i (0-basiert) → page = i + 1
             page_results = await get_ads(page)
             results.extend(page_results)
 
-            # Nächste Seite laden, falls gewünscht
             if i < page_count - 1:
-                next_page_number = i + 2  # 2, 3, 4, ...
+                next_page_number = i + 2
                 next_url = search_url.format(page=next_page_number)
                 try:
                     await page.goto(next_url, timeout=120000)
-await page.wait_for_selector(".ad-listitem", timeout=60000)
+                    await page.wait_for_selector(".ad-listitem", timeout=60000)
                 except Exception as e:
                     print(f"Failed to load page {next_page_number}: {str(e)}")
                     break
@@ -92,11 +86,9 @@ async def get_ads(page):
             data_adid = await article.get_attribute("data-adid")
             data_href = await article.get_attribute("data-href")
 
-            # Titel holen
             title_element = await article.query_selector("h2.text-module-begin a.ellipsis")
             title_text = await title_element.inner_text() if title_element else ""
 
-            # Preis holen
             price_el = await article.query_selector(
                 "p.aditem-main--middle--price-shipping--price"
             )
@@ -108,7 +100,6 @@ async def get_ads(page):
                 .strip()
             )
 
-            # Beschreibung holen
             description_el = await article.query_selector(
                 "p.aditem-main--middle--description"
             )
