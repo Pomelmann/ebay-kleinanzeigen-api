@@ -49,8 +49,8 @@ async def get_inserate_klaz(
     try:
         # Erste Seite laden
         first_url = search_url.format(page=1)
-        await page.goto(first_url, timeout=120000)
-        await page.wait_for_load_state("networkidle")
+        vawait page.goto(first_url, timeout=120000)
+await page.wait_for_selector(".ad-listitem", timeout=60000)
 
         results = []
 
@@ -65,7 +65,7 @@ async def get_inserate_klaz(
                 next_url = search_url.format(page=next_page_number)
                 try:
                     await page.goto(next_url, timeout=120000)
-                    await page.wait_for_load_state("networkidle")
+await page.wait_for_selector(".ad-listitem", timeout=60000)
                 except Exception as e:
                     print(f"Failed to load page {next_page_number}: {str(e)}")
                     break
