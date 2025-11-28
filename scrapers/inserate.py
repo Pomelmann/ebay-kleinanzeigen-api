@@ -14,7 +14,7 @@ async def get_inserate_klaz(browser_manager: PlaywrightManager,
                             page_count: int = 1):
     base_url = "https://www.kleinanzeigen.de"
 
-    # Build the price filter part of the path (unverändert)
+    # Build the price filter part of the path
     price_path = ""
     if min_price is not None or max_price is not None:
         # Convert prices to strings; if one is None, leave its place empty
@@ -22,28 +22,11 @@ async def get_inserate_klaz(browser_manager: PlaywrightManager,
         max_price_str = str(max_price) if max_price is not None else ""
         price_path = f"/preis:{min_price_str}:{max_price_str}"
 
-    # NEU: Suchpfad im Stil von Kleinanzeigen bauen
-    # Beispiel: /s-35390/seite:{page}/fahrrad/k0/preis:min:max
-    if location:
-        search_path = f"/s-{location}"
-    else:
-        search_path = "/s"
+    # Build the search path with price and page information
+    search_path = f"{price_path}/seite"
+    search_path += ":{page}"
 
-    # Seitenangabe – wir verwenden seite:{page} als Platzhalter
-    search_path += "/seite:{page}"
-
-    # Suchbegriff in den Pfad (Wörter mit - verbinden)
-    if query:
-        query_segment = query.strip().replace(" ", "-")
-        search_path += f"/{query_segment}"
-
-    # generische Kategorie (alle Kategorien). Bei Bedarf z. B. auf k0l4712 ändern.
-    search_path += "/k0"
-
-    # Preissegment hinten anhängen (wie oben gebaut)
-    search_path += price_path
-
-    # Query-Parameter wie bisher (locationStr, radius, keywords; stört nicht doppelt)
+    # Build query parameters as before
     params = {}
     if query:
         params['keywords'] = query
@@ -57,7 +40,6 @@ async def get_inserate_klaz(browser_manager: PlaywrightManager,
 
     page = await browser_manager.new_context_page()
     try:
-        # Erste Seite laden (seite:1)
         await page.goto(search_url.format(page=1), timeout=120000)
         results = []
 
@@ -67,7 +49,6 @@ async def get_inserate_klaz(browser_manager: PlaywrightManager,
 
             if i < page_count - 1:
                 try:
-                    # nächste Seite laden: seite:2, seite:3, ...
                     await page.goto(search_url.format(page=i+2), timeout=120000)
                     await page.wait_for_load_state("networkidle")
                 except Exception as e:
@@ -101,13 +82,7 @@ async def get_ads(page):
                 description_text = await description.inner_text() if description else ""
                 if data_adid and data_href:
                     data_href = f"https://www.kleinanzeigen.de{data_href}"
-                    results.append({
-                        "adid": data_adid,
-                        "url": data_href,
-                        "title": title_text,
-                        "price": price_text,
-                        "description": description_text
-                    })
+                    results.append({"adid": data_adid, "url": data_href, "title": title_text, "price": price_text, "description": description_text})
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
